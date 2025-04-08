@@ -1,49 +1,43 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using DG.Tweening;
 
 public class Tile : MonoBehaviour
 {
-    public int x;
-    public int y;
-
+    public int x, y;
+    private Image img;
+    private Color color;
     private BoardManager boardManager;
-    private Image image;
 
     void Awake()
     {
-        image = GetComponent<Image>();
+        img = GetComponent<Image>();
     }
 
-    public void Setup(int _x, int _y, BoardManager manager)
+    public void SetColor(Color c)
     {
-        x = _x;
-        y = _y;
-        boardManager = manager;
-    }
-
-    public void SetColor(Color color)
-    {
-        if (image == null)
-            image = GetComponent<Image>();
-        image.color = color;
+        color = c;
+        img.color = c;
     }
 
     public Color GetColor()
     {
-        return image.color;
+        return color;
+    }
+
+    public void AnimateTo(Vector3 targetPos)
+    {
+        transform.DOLocalMove(targetPos, 0.3f).SetEase(Ease.OutQuad);
     }
 
     public void OnClick()
     {
-        if (boardManager != null)
+        if (boardManager == null)
         {
-            boardManager.TryMoveTile(this);
+            boardManager = FindAnyObjectByType<BoardManager>(); // ✅ 자동 연결
         }
-    }
 
-    public void AnimateTo(Vector3 targetPosition)
-    {
-        transform.DOLocalMove(targetPosition, 0.2f).SetEase(Ease.OutQuad);
+        Debug.Log($"[Tile] Clicked: ({x},{y})");
+        boardManager.TryMoveTile(this);
     }
 }

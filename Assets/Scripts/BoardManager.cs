@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 
@@ -6,95 +5,98 @@ public class BoardManager : MonoBehaviour
 {
     public GameObject tilePrefab;
     public Transform boardParent;
-    public TMP_Text moveText;
     public GameManager gameManager;
+    public TextMeshProUGUI moveText;
 
-    private Tile[,] tiles = new Tile[5, 5];
+    private const int boardSize = 5;
+    private Tile[,] tiles = new Tile[boardSize, boardSize];
     private Tile emptyTile;
+    private float tileSize = 200f;
     private int moveCount = 0;
-
-    private Color[] colorPool = new Color[]
-    {
-        Color.red,
-        new Color(1f, 0.5f, 0f),
-        Color.yellow,
-        Color.green,
-        Color.blue,
-        Color.white
-    };
 
     public void InitializeBoard()
     {
-        List<Color> colors = new List<Color>();
-        foreach (Color c in colorPool)
-            for (int i = 0; i < 4; i++)
-                colors.Add(c);
-
-        for (int i = colors.Count - 1; i > 0; i--)
+        foreach (Transform child in boardParent)
         {
-            int j = Random.Range(0, i + 1);
-            (colors[i], colors[j]) = (colors[j], colors[i]);
+            Destroy(child.gameObject);
         }
 
-        int idx = 0;
-        float tileSize = 200f;
+        moveCount = 0;
+        UpdateMoveText();
 
-        for (int y = 0; y < 5; y++)
+        Color[] colors = { Color.red, new Color(1f, 0.5f, 0f), Color.yellow, Color.green, Color.blue, Color.white };
+        int[] colorCounts = new int[6];
+        System.Random rand = new System.Random();
+
+        for (int y = 0; y < boardSize; y++)
         {
-            for (int x = 0; x < 5; x++)
+            for (int x = 0; x < boardSize; x++)
             {
+                if (x == boardSize - 1 && y == boardSize - 1)
+                    continue;
+
+                int colorIndex;
+                do
+                {
+                    colorIndex = rand.Next(0, 6);
+                } while (colorCounts[colorIndex] >= 4);
+
+                colorCounts[colorIndex]++;
+
                 GameObject obj = Instantiate(tilePrefab, boardParent);
-                Tile tile = obj.GetComponent<Tile>();
-                tile.Setup(x, y, this);
-
-                if (x == 4 && y == 4)
-                {
-                    emptyTile = tile;
-                    tile.SetColor(new Color(0, 0, 0, 0));
-                }
-                else
-                {
-                    tile.SetColor(colors[idx++]);
-                }
-
-                tiles[x, y] = tile;
                 obj.transform.localPosition = new Vector3(x * tileSize, -y * tileSize, 0);
+                Tile tile = obj.GetComponent<Tile>();
+                tile.SetColor(colors[colorIndex]);
+                tile.x = x;
+                tile.y = y;
+                tiles[x, y] = tile;
             }
         }
 
-        UpdateMoveText();
+        GameObject emptyObj = Instantiate(tilePrefab, boardParent);
+        emptyObj.transform.localPosition = new Vector3((boardSize - 1) * tileSize, -(boardSize - 1) * tileSize, 0);
+        emptyTile = emptyObj.GetComponent<Tile>();
+        emptyTile.SetColor(Color.clear);
+        emptyTile.x = boardSize - 1;
+        emptyTile.y = boardSize - 1;
+        tiles[boardSize - 1, boardSize - 1] = emptyTile;
     }
 
     public void TryMoveTile(Tile clicked)
     {
-        Debug.Log($"[TryMoveTile] 클릭 좌표: {clicked.x},{clicked.y} / 빈칸: {emptyTile.x},{emptyTile.y}");
-
         int dx = clicked.x - emptyTile.x;
         int dy = clicked.y - emptyTile.y;
 
+        // 같은 행 또는 열 && 거리 1~4
         if ((dx == 0 || dy == 0) && Mathf.Abs(dx + dy) >= 1 && Mathf.Abs(dx + dy) <= 4)
         {
-            int stepX = dx != 0 ? -(int)Mathf.Sign(dx) : 0;
-            int stepY = dy != 0 ? -(int)Mathf.Sign(dy) : 0;
+            int stepX = dx != 0 ? (int)Mathf.Sign(dx) : 0;
+            int stepY = dy != 0 ? (int)Mathf.Sign(dy) : 0;
             int distance = Mathf.Abs(dx != 0 ? dx : dy);
-            float tileSize = 200f;
 
             for (int i = 0; i < distance; i++)
             {
                 int fromX = emptyTile.x + stepX * (i + 1);
                 int fromY = emptyTile.y + stepY * (i + 1);
+                int toX = emptyTile.x + stepX * i;
+                int toY = emptyTile.y + stepY * i;
 
-                if (fromX < 0 || fromX >= 5 || fromY < 0 || fromY >= 5)
+                if (
+                    fromX < 0 || fromX >= boardSize ||
+                    fromY < 0 || fromY >= boardSize ||
+                    toX < 0 || toX >= boardSize ||
+                    toY < 0 || toY >= boardSize
+                )
                 {
-                    Debug.LogWarning($"잘못된 인덱스 접근: ({fromX}, {fromY})");
+                    Debug.LogWarning($"잘못된 인덱스 접근: from({fromX},{fromY}) → to({toX},{toY})");
                     return;
                 }
 
                 Tile movingTile = tiles[fromX, fromY];
-                Vector3 targetPos = new Vector3(emptyTile.x * tileSize, -emptyTile.y * tileSize, 0);
-                tiles[emptyTile.x, emptyTile.y] = movingTile;
-                movingTile.x = emptyTile.x;
-                movingTile.y = emptyTile.y;
+                Vector3 targetPos = new Vector3(toX * tileSize, -toY * tileSize, 0);
+                tiles[toX, toY] = movingTile;
+                movingTile.x = toX;
+                movingTile.y = toY;
                 movingTile.AnimateTo(targetPos);
             }
 
@@ -108,11 +110,11 @@ public class BoardManager : MonoBehaviour
         }
         else
         {
-            Debug.Log("이동 조건 불일치: 행 또는 열 아님 / 거리가 초과됨");
+            Debug.Log("이동 조건 불일치: 같은 행 또는 열이 아니거나 거리 초과");
         }
     }
 
-    void UpdateMoveText()
+    public void UpdateMoveText()
     {
         moveText.text = $"Moves: {moveCount}";
     }
