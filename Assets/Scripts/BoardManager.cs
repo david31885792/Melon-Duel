@@ -4,25 +4,23 @@ using TMPro;
 public class BoardManager : MonoBehaviour
 {
     public GameObject tilePrefab;
-    public Transform boardParent;
     public GameManager gameManager;
     public TextMeshProUGUI moveText;
 
     private const int boardSize = 5;
     private Tile[,] tiles = new Tile[boardSize, boardSize];
     private Tile emptyTile;
-    private float tileSize = 200f;
+    private float tileSpacing = 1.1f; // 타일 간격 (world unit 기준)
+    private Vector3 origin;
     private int moveCount = 0;
 
     public void InitializeBoard()
     {
-        foreach (Transform child in boardParent)
-        {
-            Destroy(child.gameObject);
-        }
-
         moveCount = 0;
         UpdateMoveText();
+
+        // 화면 좌상단 기준 origin 계산 (카메라 기준 위치 0.1 ~ 0.9)
+        origin = Camera.main.ViewportToWorldPoint(new Vector3(0.1f, 0.9f, 10f)); // z=10은 카메라 거리 보정
 
         Color[] colors = { Color.red, new Color(1f, 0.5f, 0f), Color.yellow, Color.green, Color.blue, Color.white };
         int[] colorCounts = new int[6];
@@ -43,8 +41,8 @@ public class BoardManager : MonoBehaviour
 
                 colorCounts[colorIndex]++;
 
-                GameObject obj = Instantiate(tilePrefab, boardParent);
-                obj.transform.localPosition = new Vector3(x * tileSize, -y * tileSize, 0);
+                Vector3 worldPos = origin + new Vector3(x * tileSpacing, -y * tileSpacing, 0);
+                GameObject obj = Instantiate(tilePrefab, worldPos, Quaternion.identity);
                 Tile tile = obj.GetComponent<Tile>();
                 tile.SetColor(colors[colorIndex]);
                 tile.x = x;
@@ -53,8 +51,9 @@ public class BoardManager : MonoBehaviour
             }
         }
 
-        GameObject emptyObj = Instantiate(tilePrefab, boardParent);
-        emptyObj.transform.localPosition = new Vector3((boardSize - 1) * tileSize, -(boardSize - 1) * tileSize, 0);
+        // 빈칸 생성
+        Vector3 emptyPos = origin + new Vector3((boardSize - 1) * tileSpacing, -(boardSize - 1) * tileSpacing, 0);
+        GameObject emptyObj = Instantiate(tilePrefab, emptyPos, Quaternion.identity);
         emptyTile = emptyObj.GetComponent<Tile>();
         emptyTile.SetColor(Color.clear);
         emptyTile.x = boardSize - 1;
@@ -67,7 +66,6 @@ public class BoardManager : MonoBehaviour
         int dx = clicked.x - emptyTile.x;
         int dy = clicked.y - emptyTile.y;
 
-        // 같은 행 또는 열 && 거리 1~4
         if ((dx == 0 || dy == 0) && Mathf.Abs(dx + dy) >= 1 && Mathf.Abs(dx + dy) <= 4)
         {
             int stepX = dx != 0 ? (int)Mathf.Sign(dx) : 0;
@@ -93,7 +91,7 @@ public class BoardManager : MonoBehaviour
                 }
 
                 Tile movingTile = tiles[fromX, fromY];
-                Vector3 targetPos = new Vector3(toX * tileSize, -toY * tileSize, 0);
+                Vector3 targetPos = origin + new Vector3(toX * tileSpacing, -toY * tileSpacing, 0);
                 tiles[toX, toY] = movingTile;
                 movingTile.x = toX;
                 movingTile.y = toY;
@@ -110,13 +108,14 @@ public class BoardManager : MonoBehaviour
         }
         else
         {
-            Debug.Log("이동 조건 불일치: 같은 행 또는 열이 아니거나 거리 초과");
+            Debug.Log("이동 조건 불일치: 같은 행/열 & 거리 1~4 범위만 가능");
         }
     }
 
     public void UpdateMoveText()
     {
-        moveText.text = $"Moves: {moveCount}";
+        if (moveText != null)
+            moveText.text = $"Moves: {moveCount}";
     }
 
     public Tile[,] GetTiles()

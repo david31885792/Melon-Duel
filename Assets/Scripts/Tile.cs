@@ -27,7 +27,7 @@ public class Tile : MonoBehaviour
 
     public void AnimateTo(Vector3 targetPos)
     {
-        transform.DOLocalMove(targetPos, 0.3f).SetEase(Ease.OutQuad);
+        transform.DOMove(targetPos, 0.3f).SetEase(Ease.OutQuad);
     }
 
     public void OnClick()
